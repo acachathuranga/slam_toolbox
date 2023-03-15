@@ -103,6 +103,7 @@ include_directories(include lib/karto_sdk/include
 add_definitions(${EIGEN3_DEFINITIONS})
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  msg/LocalizedLaserScan.msg
   srvs/Pause.srv
   srvs/Reset.srv
   srvs/ClearQueue.srv
@@ -114,7 +115,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   srvs/AddSubmap.srv
   srvs/DeserializePoseGraph.srv
   srvs/SerializePoseGraph.srv
-  DEPENDENCIES builtin_interfaces geometry_msgs std_msgs nav_msgs visualization_msgs
+  DEPENDENCIES builtin_interfaces geometry_msgs std_msgs nav_msgs visualization_msgs sensor_msgs
 )
 
 #### rviz Plugin
