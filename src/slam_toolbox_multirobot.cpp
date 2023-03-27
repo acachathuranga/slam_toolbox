@@ -145,13 +145,34 @@ void MultiRobotSlamToolbox::localizedScanCallback(
   tf2::convert(localized_scan->pose.pose.pose.orientation, quat_tf);
   pose.SetHeading(tf2::getYaw(quat_tf));
 
-  LaserRangeFinder * laser = getLaser(localized_scan);
+  Matrix3 covariance;
+  covariance(0, 0) = localized_scan->pose.pose.covariance[0]; // x
+  covariance(0, 1) = localized_scan->pose.pose.covariance[1]; // xy
+  covariance(0, 2) = localized_scan->pose.pose.covariance[5]; // xyaw
+  covariance(1, 0) = localized_scan->pose.pose.covariance[6]; // yx
+  covariance(1, 1) = localized_scan->pose.pose.covariance[7]; // y
+  covariance(1, 2) = localized_scan->pose.pose.covariance[11]; // yyaw
+  covariance(2, 0) = localized_scan->pose.pose.covariance[30]; // yawx
+  covariance(2, 1) = localized_scan->pose.pose.covariance[31]; // yawy
+  covariance(2, 2) = localized_scan->pose.pose.covariance[35]; // yaw
+
+  bool laser_exists;
+  LaserRangeFinder * laser = getLaser(localized_scan, laser_exists);
+
+  // For initial scan, set covariance to a larger value
+  if (!laser_exists)
+  {
+    covariance(0, 0) = 5;
+    covariance(1, 1) = 5;
+    covariance(2, 2) = 5;
+  }
+
   if (!laser) {
     RCLCPP_WARN(get_logger(), "Failed to create device for received localizedScanner"
       " %s; discarding scan", scan->header.frame_id.c_str());
     return;
   }
-  LocalizedRangeScan * range_scan = addExternalScan(laser, scan, pose);
+  LocalizedRangeScan * range_scan = addExternalScan(laser, scan, pose, covariance);
   
   if (range_scan != nullptr)
   {
@@ -173,7 +194,7 @@ void MultiRobotSlamToolbox::localizedScanCallback(
 LocalizedRangeScan * MultiRobotSlamToolbox::addExternalScan(
   LaserRangeFinder * laser,
   const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan,
-  Pose2 & odom_pose)
+  Pose2 & odom_pose, Matrix3 & covariance)
 /*****************************************************************************/
 {
   // get our localized range scan
@@ -184,11 +205,8 @@ LocalizedRangeScan * MultiRobotSlamToolbox::addExternalScan(
   boost::mutex::scoped_lock lock(smapper_mutex_);
   bool processed = false, update_reprocessing_transform = false;
 
-  Matrix3 covariance;
-  covariance.SetToIdentity();
-
   if (processor_type_ == PROCESS) {
-    processed = smapper_->getMapper()->Process(range_scan, &covariance);
+    processed = smapper_->getMapper()->Process(range_scan, &covariance, true);
   } else if (processor_type_ == PROCESS_FIRST_NODE) {
     processed = smapper_->getMapper()->ProcessAtDock(range_scan, &covariance);
     processor_type_ = PROCESS;
@@ -229,9 +247,11 @@ LocalizedRangeScan * MultiRobotSlamToolbox::addExternalScan(
 
 /*****************************************************************************/
 LaserRangeFinder * MultiRobotSlamToolbox::getLaser(
-  const slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr localized_scan)
+  const slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr localized_scan,
+  bool & exists)
 /*****************************************************************************/
 {
+  exists = true;
   const std::string & frame = localized_scan->scan.header.frame_id;
   if (lasers_.find(frame) == lasers_.end()) {
     try {
@@ -243,9 +263,21 @@ LaserRangeFinder * MultiRobotSlamToolbox::getLaser(
         "aborting initialization (%s)", frame.c_str(), e.what());
       return nullptr;
     }
+
+    exists = false;
   }
 
   return lasers_[frame].getLaser();
+}
+
+
+/*****************************************************************************/
+LaserRangeFinder * MultiRobotSlamToolbox::getLaser(
+  const slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr localized_scan)
+/*****************************************************************************/
+{
+  bool exists;
+  return getLaser(localized_scan, exists);
 }
 
 /*****************************************************************************/

@@ -35,7 +35,7 @@ protected:
     karto::LaserRangeFinder * laser, const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan,
     karto::Pose2 & karto_pose);
   LocalizedRangeScan * addExternalScan(LaserRangeFinder * laser,
-    const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, Pose2 & odom_pose);
+    const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, Pose2 & odom_pose, Matrix3 & covariance);
   void publishLocalizedScan( 
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, const Pose2 &offset,
     const Pose2 & pose, const Matrix3 & cov,
@@ -49,6 +49,7 @@ protected:
     std::shared_ptr<slam_toolbox::srv::DeserializePoseGraph::Response> resp) override;
   void localizedScanCallback(slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr localized_scan);
   LaserRangeFinder * getLaser(const slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr localized_scan);
+  LaserRangeFinder * getLaser(const slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr localized_scan, bool & exists);
   using SlamToolbox::getLaser;
   
   std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::LocalizedLaserScan>> localized_scan_pub_;
