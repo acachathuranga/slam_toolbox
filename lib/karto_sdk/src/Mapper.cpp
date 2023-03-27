@@ -2676,7 +2676,7 @@ kt_bool Mapper::Process(Object *  /*pObject*/)  // NOLINT
   return true;
 }
 
-kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
+kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance, bool scanMatched)
 {
   if (pScan != NULL) {
     karto::LaserRangeFinder * pLaserRangeFinder = pScan->GetLaserRangeFinder();
@@ -2709,7 +2709,7 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     cov.SetToIdentity();
 
     // correct scan (if not first scan)
-    if (m_pUseScanMatching->GetValue() && pLastScan != NULL) {
+    if (m_pUseScanMatching->GetValue() && pLastScan != NULL &&  !scanMatched) {
       Pose2 bestPose;
       m_pSequentialScanMatcher->MatchScan(pScan,
         m_pMapperSensorManager->GetRunningScans(pScan->GetSensorName()),
@@ -2720,6 +2720,16 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
         *covariance = cov;
       }
     }
+
+    // Externally processed scan. Use input covariance
+    if (scanMatched) {
+      if (covariance) {
+        cov = *covariance;
+      } else {
+        std::cout << "Scan marked as processed, but no covariance provided. Using unit covariance!" << std::endl;
+      }
+    }
+    
 
     // add scan to buffer and assign id
     m_pMapperSensorManager->AddScan(pScan);

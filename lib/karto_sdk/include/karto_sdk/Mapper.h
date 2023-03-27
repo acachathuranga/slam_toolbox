@@ -1993,10 +1993,13 @@ public:
    * @param pScan A localized range scan that has pose information associated directly with the scan data.  The pose
    * is that of the range device originating the scan.  Note that the mapper will set corrected pose
    * information in the scan object.
+   * 
+   * @param skipScanMatching If true, will assume an external scan matcher has processed pScan and covariance data is
+   * valid. Input covariance value will be used to process the scan
    *
    * @return true if the scan was added successfully, false otherwise
    */
-  virtual kt_bool Process(LocalizedRangeScan * pScan, Matrix3 * covariance = nullptr);
+  virtual kt_bool Process(LocalizedRangeScan * pScan, Matrix3 * covariance = nullptr, bool scanMatched = false);
 
   /**
    * Process an Object
