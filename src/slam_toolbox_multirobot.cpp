@@ -59,11 +59,73 @@ void MultiRobotSlamToolbox::laserCallback(
   LocalizedRangeScan * range_scan = addScan(laser, scan, pose);
   if (range_scan != nullptr)
   {
-    Matrix3 covariance;
-    covariance.SetToIdentity();
     publishLocalizedScan(scan, laser->GetOffsetPose(), 
-        range_scan->GetCorrectedPose(), covariance, scan->header.stamp);
+        range_scan->GetCorrectedPose(), covariance_, scan->header.stamp);
   }
+}
+
+/*****************************************************************************/
+LocalizedRangeScan * MultiRobotSlamToolbox::addScan(
+  LaserRangeFinder * laser,
+  const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan,
+  Pose2 & odom_pose)
+/*****************************************************************************/
+{
+  // get our localized range scan
+  LocalizedRangeScan * range_scan = getLocalizedRangeScan(
+    laser, scan, odom_pose);
+
+  // Add the localized range scan to the smapper
+  boost::mutex::scoped_lock lock(smapper_mutex_);
+  bool processed = false, update_reprocessing_transform = false;
+
+  Matrix3 covariance;
+  covariance.SetToIdentity();
+
+  if (processor_type_ == PROCESS) {
+    processed = smapper_->getMapper()->Process(range_scan, &covariance);
+  } else if (processor_type_ == PROCESS_FIRST_NODE) {
+    processed = smapper_->getMapper()->ProcessAtDock(range_scan, &covariance);
+    processor_type_ = PROCESS;
+    update_reprocessing_transform = true;
+  } else if (processor_type_ == PROCESS_NEAR_REGION) {
+    boost::mutex::scoped_lock l(pose_mutex_);
+    if (!process_near_pose_) {
+      RCLCPP_ERROR(get_logger(), "Process near region called without a "
+        "valid region request. Ignoring scan.");
+      return nullptr;
+    }
+    range_scan->SetOdometricPose(*process_near_pose_);
+    range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
+    process_near_pose_.reset(nullptr);
+    processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(
+      range_scan, false, &covariance);
+    update_reprocessing_transform = true;
+    processor_type_ = PROCESS;
+  } else {
+    RCLCPP_FATAL(get_logger(),
+      "SlamToolbox: No valid processor type set! Exiting.");
+    exit(-1);
+  }
+
+  // if successfully processed, create odom to map transformation
+  // and add our scan to storage
+  if (processed) {
+    if (enable_interactive_mode_) {
+      scan_holder_->addScan(*scan);
+    }
+
+    setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
+      scan->header.stamp, update_reprocessing_transform);
+    dataset_->Add(range_scan);
+    covariance_ = covariance;
+    publishPose(range_scan->GetCorrectedPose(), covariance, scan->header.stamp);
+  } else {
+    delete range_scan;
+    range_scan = nullptr;
+  }
+
+  return range_scan;
 }
 
 /*****************************************************************************/
@@ -210,11 +272,15 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
   tf2::Transform transform(q, tf2::Vector3(pose.GetX(), pose.GetY(), 0.0));
   tf2::toMsg(transform, scan_msg.pose.pose.pose);
 
-  scan_msg.pose.pose.covariance[0] = cov(0, 0) * position_covariance_scale_;  // x
-  scan_msg.pose.pose.covariance[1] = cov(0, 1) * position_covariance_scale_;  // xy
-  scan_msg.pose.pose.covariance[6] = cov(1, 0) * position_covariance_scale_;  // xy
-  scan_msg.pose.pose.covariance[7] = cov(1, 1) * position_covariance_scale_;  // y
-  scan_msg.pose.pose.covariance[35] = cov(2, 2) * yaw_covariance_scale_;      // yaw
+  scan_msg.pose.pose.covariance[0] = cov(0, 0);   // x
+  scan_msg.pose.pose.covariance[1] = cov(0, 1);   // xy
+  scan_msg.pose.pose.covariance[5] = cov(0, 2);   // xyaw
+  scan_msg.pose.pose.covariance[6] = cov(1, 0);   // yx
+  scan_msg.pose.pose.covariance[7] = cov(1, 1);   // y
+  scan_msg.pose.pose.covariance[11] = cov(1, 2);  // yyaw
+  scan_msg.pose.pose.covariance[30] = cov(2, 0);  // yawx
+  scan_msg.pose.pose.covariance[31] = cov(2, 1);  // yawy
+  scan_msg.pose.pose.covariance[35] = cov(2, 2);  // yaw
   scan_msg.pose.header.stamp = t;
 
   // Set prefixed frame names

@@ -31,6 +31,9 @@ public:
   ~MultiRobotSlamToolbox() {};
 
 protected:
+  karto::LocalizedRangeScan * addScan(
+    karto::LaserRangeFinder * laser, const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan,
+    karto::Pose2 & karto_pose);
   LocalizedRangeScan * addExternalScan(LaserRangeFinder * laser,
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, Pose2 & odom_pose);
   void publishLocalizedScan( 
@@ -52,6 +55,7 @@ protected:
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
   std::string localized_scan_topic_;
   std::string current_ns_;
+  Matrix3 covariance_;
 };
 
 }  // namespace slam_toolbox
