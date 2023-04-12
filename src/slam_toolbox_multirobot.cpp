@@ -187,6 +187,7 @@ LaserRangeFinder * MultiRobotSlamToolbox::getLaser(
 void MultiRobotSlamToolbox::publishLocalizedScan( 
   const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan,
   const Pose2 & offset,
+  const Pose2 & odometric_pose,
   const Pose2 & pose,
   const Matrix3 & cov,
   const rclcpp::Time & t)
