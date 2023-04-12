@@ -77,11 +77,7 @@ void MultiRobotSlamToolbox::localizedScanCallback(
   sensor_msgs::msg::LaserScan::ConstSharedPtr scan = 
     std::make_shared<sensor_msgs::msg::LaserScan>(localized_scan->scan);
   Pose2 pose;
-  pose.SetX(localized_scan->odometric_pose.pose.pose.position.x);
-  pose.SetY(localized_scan->odometric_pose.pose.pose.position.y);
-  tf2::Quaternion quat_tf;
-  tf2::convert(localized_scan->odometric_pose.pose.pose.orientation, quat_tf);
-  pose.SetHeading(tf2::getYaw(quat_tf));
+  convertPose(localized_scan->odometric_pose, pose);
 
   LaserRangeFinder * laser = getLaser(localized_scan);
   if (!laser) {
@@ -205,10 +201,7 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
   tf2::toMsg(scanner_offset, scan_msg.scanner_offset.transform);
   scan_msg.scanner_offset.header.stamp = t;
 
-  tf2::Quaternion q(0., 0., 0., 1.0);
-  q.setRPY(0., 0., pose.GetHeading());
-  tf2::Transform transform(q, tf2::Vector3(pose.GetX(), pose.GetY(), 0.0));
-  tf2::toMsg(transform, scan_msg.odometric_pose.pose.pose);
+  convertPose(odometric_pose, scan_msg.odometric_pose);
 
   scan_msg.odometric_pose.pose.covariance[0] = cov(0, 0) * position_covariance_scale_;  // x
   scan_msg.odometric_pose.pose.covariance[1] = cov(0, 1) * position_covariance_scale_;  // xy
@@ -249,6 +242,31 @@ bool MultiRobotSlamToolbox::deserializePoseGraphCallback(
   }
 
   return SlamToolbox::deserializePoseGraphCallback(request_header, req, resp);
+}
+
+/*****************************************************************************/
+void MultiRobotSlamToolbox::convertPose(
+  geometry_msgs::msg::PoseWithCovarianceStamped poseI, Pose2 & poseO)
+/*****************************************************************************/
+{
+  poseO.SetX(poseI.pose.pose.position.x);
+  poseO.SetY(poseI.pose.pose.position.y);
+  tf2::Quaternion quat_tf;
+  tf2::convert(poseI.pose.pose.orientation, quat_tf);
+  poseO.SetHeading(tf2::getYaw(quat_tf));
+  return;
+}
+
+/*****************************************************************************/
+void MultiRobotSlamToolbox::convertPose(
+  Pose2 poseI, geometry_msgs::msg::PoseWithCovarianceStamped & poseO)
+/*****************************************************************************/
+{
+  tf2::Quaternion q(0., 0., 0., 1.0);
+  q.setRPY(0., 0., poseI.GetHeading());
+  tf2::Transform transform(q, tf2::Vector3(poseI.GetX(), poseI.GetY(), 0.0));
+  tf2::toMsg(transform, poseO.pose.pose);
+  return;
 }
 
 }
