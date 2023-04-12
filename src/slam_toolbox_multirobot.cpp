@@ -208,7 +208,6 @@ slam_toolbox::msg::LocalizedLaserScan MultiRobotSlamToolbox::getCorrectedLocaliz
     {
       RCLCPP_WARN(get_logger(), "Message drop detected from %s. Dropped %d messages. Attempting pose recovery!", 
         msg->scan.header.frame_id.c_str(), msg->seq - last_data->localized_scan.seq);
-      data_dropped = true;
 
       Pose2 last_odometric_pose, last_pose, odometric_pose, pose, corrected_odometric_pose;
 
