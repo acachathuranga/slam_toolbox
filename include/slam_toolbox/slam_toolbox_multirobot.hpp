@@ -27,6 +27,23 @@ namespace slam_toolbox
 class MultiRobotSlamToolbox : public SlamToolbox
 {
 public:
+  struct ExternalSensorData
+  {
+    slam_toolbox::msg::LocalizedLaserScan localized_scan;
+    std::shared_ptr<Transform> offset;
+
+    ExternalSensorData() {};
+    ExternalSensorData(slam_toolbox::msg::LocalizedLaserScan msg) : localized_scan(msg)
+    {
+      Pose2 pose;
+      offset = std::make_shared<Transform>(pose);
+    };
+
+    ExternalSensorData(slam_toolbox::msg::LocalizedLaserScan msg, Transform offset_transform) :
+      localized_scan(msg) {offset = std::make_shared<Transform>(offset_transform);};
+    void setOffset(Transform transform) {offset = std::make_shared<Transform>(transform);};
+  };
+
   explicit MultiRobotSlamToolbox(rclcpp::NodeOptions);
   ~MultiRobotSlamToolbox() {};
 
