@@ -80,7 +80,7 @@ void MultiRobotSlamToolbox::localizedScanCallback(
   pose.SetX(localized_scan->pose.pose.pose.position.x);
   pose.SetY(localized_scan->pose.pose.pose.position.y);
   tf2::Quaternion quat_tf;
-  tf2::convert(localized_scan->pose.pose.pose.orientation, quat_tf);
+  tf2::convert(localized_scan->odometric_pose.pose.pose.orientation, quat_tf);
   pose.SetHeading(tf2::getYaw(quat_tf));
 
   LaserRangeFinder * laser = getLaser(localized_scan);
@@ -101,7 +101,7 @@ void MultiRobotSlamToolbox::localizedScanCallback(
     tf2::Transform transform(q, tf2::Vector3(pose.GetX(), pose.GetY(), 0.0));
     tf2::toMsg(transform, tf_msg.transform);
     tf_msg.header.frame_id = map_frame_;
-    tf_msg.header.stamp = localized_scan->pose.header.stamp;
+    tf_msg.header.stamp = localized_scan->odometric_pose.header.stamp;
     tf_msg.child_frame_id = localized_scan->scanner_offset.header.frame_id;
     tfB_->sendTransform(tf_msg);
   }
@@ -208,21 +208,21 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
   tf2::Quaternion q(0., 0., 0., 1.0);
   q.setRPY(0., 0., pose.GetHeading());
   tf2::Transform transform(q, tf2::Vector3(pose.GetX(), pose.GetY(), 0.0));
-  tf2::toMsg(transform, scan_msg.pose.pose.pose);
+  tf2::toMsg(transform, scan_msg.odometric_pose.pose.pose);
 
-  scan_msg.pose.pose.covariance[0] = cov(0, 0) * position_covariance_scale_;  // x
-  scan_msg.pose.pose.covariance[1] = cov(0, 1) * position_covariance_scale_;  // xy
-  scan_msg.pose.pose.covariance[6] = cov(1, 0) * position_covariance_scale_;  // xy
-  scan_msg.pose.pose.covariance[7] = cov(1, 1) * position_covariance_scale_;  // y
-  scan_msg.pose.pose.covariance[35] = cov(2, 2) * yaw_covariance_scale_;      // yaw
-  scan_msg.pose.header.stamp = t;
+  scan_msg.odometric_pose.pose.covariance[0] = cov(0, 0) * position_covariance_scale_;  // x
+  scan_msg.odometric_pose.pose.covariance[1] = cov(0, 1) * position_covariance_scale_;  // xy
+  scan_msg.odometric_pose.pose.covariance[6] = cov(1, 0) * position_covariance_scale_;  // xy
+  scan_msg.odometric_pose.pose.covariance[7] = cov(1, 1) * position_covariance_scale_;  // y
+  scan_msg.odometric_pose.pose.covariance[35] = cov(2, 2) * yaw_covariance_scale_;      // yaw
+  scan_msg.odometric_pose.header.stamp = t;
 
   // Set prefixed frame names
   scan_msg.scan.header.frame_id = (*(scan->header.frame_id.cbegin()) == '/') ? 
     current_ns_ + scan->header.frame_id :
     current_ns_ + "/" + scan->header.frame_id;
 
-  scan_msg.pose.header.frame_id = (*(map_frame_.cbegin()) == '/') ? 
+  scan_msg.odometric_pose.header.frame_id = (*(map_frame_.cbegin()) == '/') ? 
     current_ns_ + map_frame_ :
     current_ns_ + "/" + map_frame_;
 
