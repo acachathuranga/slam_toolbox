@@ -62,7 +62,8 @@ void MultiRobotSlamToolbox::laserCallback(
     Matrix3 covariance;
     covariance.SetToIdentity();
     publishLocalizedScan(scan, laser->GetOffsetPose(), 
-        range_scan->GetOdometricPose(), covariance, scan->header.stamp);
+        range_scan->GetOdometricPose(), range_scan->GetCorrectedPose(),
+        covariance, scan->header.stamp);
   }
 }
 
@@ -224,6 +225,9 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
   scan_msg.scanner_offset.header.frame_id = (*(base_frame_.cbegin()) == '/') ?
     current_ns_ + base_frame_ :
     current_ns_ + "/" + base_frame_;
+
+  scan_msg.pose = scan_msg.odometric_pose;
+  convertPose(pose, scan_msg.pose);
 
   localized_scan_pub_->publish(scan_msg);
 }

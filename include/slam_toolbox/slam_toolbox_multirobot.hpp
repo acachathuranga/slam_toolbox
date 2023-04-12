@@ -35,7 +35,7 @@ protected:
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, Pose2 & odom_pose);
   void publishLocalizedScan( 
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, const Pose2 &offset,
-    const Pose2 & pose, const Matrix3 & cov,
+    const Pose2 & odometric_pose, const Pose2 & pose, const Matrix3 & cov,
     const rclcpp::Time & t);
 
   void convertPose(geometry_msgs::msg::PoseWithCovarianceStamped poseI, Pose2 & poseO);
