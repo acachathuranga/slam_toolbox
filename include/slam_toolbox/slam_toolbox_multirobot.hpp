@@ -73,6 +73,7 @@ protected:
   
   std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::LocalizedLaserScan>> localized_scan_pub_;
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
+  std::map<std::string, ExternalSensorData> external_sensor_data_;
   std::string localized_scan_topic_;
   std::string current_ns_;
   uint32_t local_scan_id_;
