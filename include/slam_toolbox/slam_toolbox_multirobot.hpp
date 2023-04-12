@@ -54,6 +54,8 @@ protected:
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, const Pose2 &offset,
     const Pose2 & odometric_pose, const Pose2 & pose, const Matrix3 & cov,
     const rclcpp::Time & t);
+  slam_toolbox::msg::LocalizedLaserScan getCorrectedLocalizedScan(
+    slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr msg);
 
   void convertPose(geometry_msgs::msg::PoseWithCovarianceStamped poseI, Pose2 & poseO);
   void convertPose(Pose2 poseI, geometry_msgs::msg::PoseWithCovarianceStamped & poseO);

@@ -21,7 +21,7 @@ namespace slam_toolbox
 
 /*****************************************************************************/
 MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
-: SlamToolbox(options), localized_scan_topic_("/localized_scan")
+: SlamToolbox(options), localized_scan_topic_("/localized_scan"), local_scan_id_(0)
 /*****************************************************************************/
 {
     current_ns_ = this->get_namespace() + 1;
@@ -75,10 +75,14 @@ void MultiRobotSlamToolbox::localizedScanCallback(
                           localized_scan->scan.header.frame_id.find('/'));
   if (scan_ns == current_ns_) return; // Ignore callbacks from ourself
 
+  // Verify message sequence and compensate message losses
+  slam_toolbox::msg::LocalizedLaserScan corrected_localized_scan = 
+    getCorrectedLocalizedScan(localized_scan);
+
   sensor_msgs::msg::LaserScan::ConstSharedPtr scan = 
     std::make_shared<sensor_msgs::msg::LaserScan>(localized_scan->scan);
   Pose2 pose;
-  convertPose(localized_scan->odometric_pose, pose);
+  convertPose(corrected_localized_scan.odometric_pose, pose);
 
   LaserRangeFinder * laser = getLaser(localized_scan);
   if (!laser) {
@@ -181,6 +185,58 @@ LaserRangeFinder * MultiRobotSlamToolbox::getLaser(
   }
 
   return lasers_[frame].getLaser();
+}
+
+/*****************************************************************************/
+slam_toolbox::msg::LocalizedLaserScan MultiRobotSlamToolbox::getCorrectedLocalizedScan(
+  slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr msg)
+/*****************************************************************************/
+{
+  
+
+  if (external_sensor_data_.find(msg->scan.header.frame_id) == external_sensor_data_.end()) 
+  {
+    // New message. Add to database
+    external_sensor_data_[msg->scan.header.frame_id] = ExternalSensorData(*msg);
+  } 
+  else 
+  {
+    // Check for message losses
+    ExternalSensorData * last_data = &external_sensor_data_[msg->scan.header.frame_id];
+
+    if (msg->seq - last_data->localized_scan.seq > 1)
+    {
+      RCLCPP_WARN(get_logger(), "Message drop detected from %s. Dropped %d messages. Attempting pose recovery!", 
+        msg->scan.header.frame_id.c_str(), msg->seq - last_data->localized_scan.seq);
+      data_dropped = true;
+
+      Pose2 last_odometric_pose, last_pose, odometric_pose, pose, corrected_odometric_pose;
+
+      // Get last odometry correction based on last poses
+      convertPose(last_data->localized_scan.odometric_pose, last_odometric_pose);
+      convertPose(last_data->localized_scan.pose, last_pose);
+      Transform lastTransform(last_pose, last_odometric_pose);
+
+      // Estimate new odometry based on last correction and latest pose
+      slam_toolbox::msg::LocalizedLaserScan localized_scan = *msg;
+      convertPose(msg->pose, pose);
+      corrected_odometric_pose = lastTransform.TransformPose(pose);
+      convertPose(corrected_odometric_pose, localized_scan.odometric_pose);
+
+      // Calculate odometry offset transform
+      convertPose(msg->odometric_pose, odometric_pose);
+      Transform correctionTransform(odometric_pose, corrected_odometric_pose);
+      last_data->setOffset(correctionTransform);
+    }  
+    
+    // Odometric pose correction
+    last_data->localized_scan = *msg;
+    Pose2 odometric_pose;
+    convertPose(last_data->localized_scan.odometric_pose, odometric_pose);
+    convertPose(last_data->offset->TransformPose(odometric_pose), last_data->localized_scan.odometric_pose);
+  }
+
+  return external_sensor_data_[msg->scan.header.frame_id].localized_scan;
 }
 
 /*****************************************************************************/
