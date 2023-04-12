@@ -73,6 +73,7 @@ protected:
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
   std::string localized_scan_topic_;
   std::string current_ns_;
+  uint32_t local_scan_id_;
 };
 
 }  // namespace slam_toolbox

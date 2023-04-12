@@ -195,6 +195,7 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
   slam_toolbox::msg::LocalizedLaserScan scan_msg; 
 
   scan_msg.scan = *scan;
+  scan_msg.seq = local_scan_id_++;
 
   tf2::Quaternion q_offset(0., 0., 0., 1.0);
   q_offset.setRPY(0., 0., offset.GetHeading());
