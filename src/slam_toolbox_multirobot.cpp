@@ -28,6 +28,11 @@ MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
 
     std::string collaboration_mode = this->declare_parameter("collaboration_mode", std::string("peer"));
     collaboration_mode = this->get_parameter("collaboration_mode").as_string();
+    shared_min_travel_distance_ = this->declare_parameter("shared_minimum_travel_distance", 1.0);
+    shared_min_travel_distance_ = this->get_parameter("shared_minimum_travel_distance").as_double();
+    shared_min_travel_heading_ = this->declare_parameter("shared_minimum_travel_heading", 1.5);
+    shared_min_travel_heading_ = this->get_parameter("shared_minimum_travel_heading").as_double();
+
     if (collaboration_mode == std::string("peer")) {
       RCLCPP_INFO(get_logger(), "Collaboration Mode: peer [Local mapping + Map merging]");
       collaboration_mode_ = CollaborationMode::PEER;
@@ -241,8 +246,16 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
   const rclcpp::Time & t)
 /*****************************************************************************/
 {
-  slam_toolbox::msg::LocalizedLaserScan scan_msg; 
+  if ((std::hypot(pose.GetX() - last_pose_.GetX(), 
+                  pose.GetY() - last_pose_.GetY()) < shared_min_travel_distance_) &&
+      (abs(pose.GetHeading() - last_pose_.GetHeading()) < shared_min_travel_heading_))
+  {
+    // Not enough displacement from last shared LocalizedScan
+    return;
+  }
+  last_pose_ = pose;
 
+  slam_toolbox::msg::LocalizedLaserScan scan_msg; 
   scan_msg.scan = *scan;
 
   tf2::Quaternion q_offset(0., 0., 0., 1.0);

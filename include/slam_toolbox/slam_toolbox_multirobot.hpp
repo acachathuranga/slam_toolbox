@@ -61,9 +61,11 @@ protected:
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
   std::string localized_scan_topic_;
   CollaborationMode collaboration_mode_;
+  double shared_min_travel_distance_, shared_min_travel_heading_;
   std::map<std::string, geometry_msgs::msg::TransformStamped> transforms_;
   rclcpp::TimerBase::SharedPtr transform_publish_timer_;
   std::mutex transforms_mutex_;
+  Pose2 last_pose_;
   std::string current_ns_;
 };
 

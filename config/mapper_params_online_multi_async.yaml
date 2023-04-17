@@ -18,6 +18,9 @@ $(var namespace)/slam_toolbox:
 
     # Collaborative parameters
     collaboration_mode: publisher # peer | publisher | subscriber
+    shared_minimum_travel_distance: 1.0
+    shared_minimum_travel_heading: 1.5
+
     # if you'd like to immediately start continuing a map at a given pose
     # or at the dock, but they are mutually exclusive, if pose is given
     # will use pose
