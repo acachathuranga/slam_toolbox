@@ -26,6 +26,27 @@ MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
 {
     current_ns_ = this->get_namespace() + 1;
 
+    std::string collaboration_mode = this->declare_parameter("collaboration_mode", std::string("peer"));
+    collaboration_mode = this->get_parameter("collaboration_mode").as_string();
+    if (collaboration_mode == std::string("peer")) {
+      RCLCPP_INFO(get_logger(), "Collaboration Mode: peer [Local mapping + Map merging]");
+      collaboration_mode_ = CollaborationMode::PEER;
+    } else if (collaboration_mode == std::string("publisher")) {
+      RCLCPP_INFO(get_logger(), "Collaboration Mode: publisher [Local mapping only]");
+      collaboration_mode_ = CollaborationMode::PUBLISHER;
+    } else if (collaboration_mode == std::string("subscriber")) {
+      RCLCPP_INFO(get_logger(), "Collaboration Mode: subscriber [Map merging only]");
+      collaboration_mode_ = CollaborationMode::SUBSCRIBER;
+    } else
+    {
+      RCLCPP_INFO(get_logger(), "Invalid Collaboration Mode : %s. Falling back to publisher mode [Local only]", 
+        collaboration_mode.c_str());
+      collaboration_mode_ = CollaborationMode::PUBLISHER;
+    }
+
+    switch (collaboration_mode_)
+    {
+      case CollaborationMode::PEER:
         localized_scan_pub_ = this->create_publisher<slam_toolbox::msg::LocalizedLaserScan>(
           localized_scan_topic_, 1000);
         localized_scan_sub_ = this->create_subscription<slam_toolbox::msg::LocalizedLaserScan>(
@@ -33,6 +54,22 @@ MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
           this, std::placeholders::_1));
         transform_publish_timer_ = this->create_wall_timer(std::chrono::duration<double>(0.1), 
           std::bind(&MultiRobotSlamToolbox::publishTransforms, this));
+        break;
+      
+      case CollaborationMode::PUBLISHER:
+        localized_scan_pub_ = this->create_publisher<slam_toolbox::msg::LocalizedLaserScan>(
+          localized_scan_topic_, 1000);
+        break;
+
+      case CollaborationMode::SUBSCRIBER:
+        localized_scan_sub_ = this->create_subscription<slam_toolbox::msg::LocalizedLaserScan>(
+          localized_scan_topic_, 1000, std::bind(&MultiRobotSlamToolbox::localizedScanCallback, 
+          this, std::placeholders::_1));
+        transform_publish_timer_ = this->create_wall_timer(std::chrono::duration<double>(0.1), 
+          std::bind(&MultiRobotSlamToolbox::publishTransforms, this));
+      
+      default:;
+    }
 }
 
 /*****************************************************************************/
@@ -40,6 +77,11 @@ void MultiRobotSlamToolbox::laserCallback(
   sensor_msgs::msg::LaserScan::ConstSharedPtr scan)
 /*****************************************************************************/
 {
+  // Ignore scan callbacks in Merge only mode
+  if (collaboration_mode_ == CollaborationMode::SUBSCRIBER) {
+    return;
+  }
+
   // store scan header
   scan_header = scan->header;
   // no odom info
@@ -74,7 +116,7 @@ void MultiRobotSlamToolbox::localizedScanCallback(
 {
   std::string scan_ns = localized_scan->scan.header.frame_id.substr(0, 
                           localized_scan->scan.header.frame_id.find('/'));
-  if (scan_ns == current_ns_) return; // Ignore callbacks from ourself
+  if (collaboration_mode_==CollaborationMode::PEER && scan_ns == current_ns_) return; // Ignore callbacks from ourself
 
   sensor_msgs::msg::LaserScan::ConstSharedPtr scan = 
     std::make_shared<sensor_msgs::msg::LaserScan>(localized_scan->scan);

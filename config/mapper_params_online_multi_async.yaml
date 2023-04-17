@@ -16,6 +16,8 @@ $(var namespace)/slam_toolbox:
     scan_topic: scan
     mode: mapping #localization
 
+    # Collaborative parameters
+    collaboration_mode: publisher # peer | publisher | subscriber
     # if you'd like to immediately start continuing a map at a given pose
     # or at the dock, but they are mutually exclusive, if pose is given
     # will use pose

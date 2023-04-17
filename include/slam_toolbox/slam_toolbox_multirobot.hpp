@@ -28,6 +28,13 @@ namespace slam_toolbox
 class MultiRobotSlamToolbox : public SlamToolbox
 {
 public:
+  enum class CollaborationMode 
+  {
+    PEER,
+    PUBLISHER,
+    SUBSCRIBER
+  };
+
   explicit MultiRobotSlamToolbox(rclcpp::NodeOptions);
   ~MultiRobotSlamToolbox() {};
 
@@ -53,6 +60,7 @@ protected:
   std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::LocalizedLaserScan>> localized_scan_pub_;
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
   std::string localized_scan_topic_;
+  CollaborationMode collaboration_mode_;
   std::map<std::string, geometry_msgs::msg::TransformStamped> transforms_;
   rclcpp::TimerBase::SharedPtr transform_publish_timer_;
   std::mutex transforms_mutex_;
