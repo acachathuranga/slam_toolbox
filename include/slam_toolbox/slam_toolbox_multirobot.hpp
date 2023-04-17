@@ -18,6 +18,7 @@
 #define SLAM_TOOLBOX__SLAM_TOOLBOX_MULTIROBOT_HPP_
 
 #include <memory>
+#include <mutex>
 #include "slam_toolbox/slam_toolbox_common.hpp"
 #include "slam_toolbox/toolbox_msgs.hpp"
 
@@ -37,6 +38,7 @@ protected:
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan, const Pose2 &offset,
     const Pose2 & pose, const Matrix3 & cov,
     const rclcpp::Time & t);
+  void publishTransforms();
 
   // callbacks
   void laserCallback(sensor_msgs::msg::LaserScan::ConstSharedPtr scan) override;
@@ -51,6 +53,9 @@ protected:
   std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::LocalizedLaserScan>> localized_scan_pub_;
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
   std::string localized_scan_topic_;
+  std::map<std::string, geometry_msgs::msg::TransformStamped> transforms_;
+  rclcpp::TimerBase::SharedPtr transform_publish_timer_;
+  std::mutex transforms_mutex_;
   std::string current_ns_;
 };
 
