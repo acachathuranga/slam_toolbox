@@ -21,7 +21,9 @@ namespace slam_toolbox
 
 /*****************************************************************************/
 MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
-: SlamToolbox(options), localized_scan_topic_("/localized_scan")
+: SlamToolbox(options), 
+  localized_scan_topic_("/localized_scan"), 
+  last_pose_(-1000, -1000, -1000)
 /*****************************************************************************/
 {
     current_ns_ = this->get_namespace() + 1;
