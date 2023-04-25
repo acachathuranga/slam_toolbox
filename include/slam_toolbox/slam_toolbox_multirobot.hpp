@@ -18,6 +18,7 @@
 #define SLAM_TOOLBOX__SLAM_TOOLBOX_MULTIROBOT_HPP_
 
 #include <memory>
+#include <mutex>
 #include "slam_toolbox/slam_toolbox_common.hpp"
 #include "slam_toolbox/toolbox_msgs.hpp"
 
@@ -56,6 +57,7 @@ protected:
     const rclcpp::Time & t);
   slam_toolbox::msg::LocalizedLaserScan getCorrectedLocalizedScan(
     slam_toolbox::msg::LocalizedLaserScan::ConstSharedPtr msg);
+    void publishTransforms();
 
   void convertPose(geometry_msgs::msg::PoseWithCovarianceStamped poseI, Pose2 & poseO);
   void convertPose(Pose2 poseI, geometry_msgs::msg::PoseWithCovarianceStamped & poseO);
@@ -75,6 +77,9 @@ protected:
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
   std::map<std::string, ExternalSensorData> external_sensor_data_;
   std::string localized_scan_topic_;
+  std::map<std::string, geometry_msgs::msg::TransformStamped> transforms_;
+  rclcpp::TimerBase::SharedPtr transform_publish_timer_;
+  std::mutex transforms_mutex_;
   std::string current_ns_;
   uint32_t local_scan_id_;
 };

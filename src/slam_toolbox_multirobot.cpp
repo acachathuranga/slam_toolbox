@@ -27,10 +27,12 @@ MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
     current_ns_ = this->get_namespace() + 1;
 
     localized_scan_pub_ = this->create_publisher<slam_toolbox::msg::LocalizedLaserScan>(
-    localized_scan_topic_, 10);
+      localized_scan_topic_, 1000);
     localized_scan_sub_ = this->create_subscription<slam_toolbox::msg::LocalizedLaserScan>(
-        localized_scan_topic_, 10, std::bind(&MultiRobotSlamToolbox::localizedScanCallback, 
-        this, std::placeholders::_1));
+      localized_scan_topic_, 1000, std::bind(&MultiRobotSlamToolbox::localizedScanCallback, 
+      this, std::placeholders::_1));
+    transform_publish_timer_ = this->create_wall_timer(std::chrono::duration<double>(0.1), 
+      std::bind(&MultiRobotSlamToolbox::publishTransforms, this));
 }
 
 /*****************************************************************************/
@@ -94,7 +96,8 @@ void MultiRobotSlamToolbox::localizedScanCallback(
   
   if (range_scan != nullptr)
   {
-    // Publish transform
+    std::unique_lock lock(transforms_mutex_);
+    // Set transform
     pose = range_scan->GetCorrectedPose();
     tf2::Quaternion q(0., 0., 0., 1.0);
     geometry_msgs::msg::TransformStamped tf_msg;
@@ -104,7 +107,8 @@ void MultiRobotSlamToolbox::localizedScanCallback(
     tf_msg.header.frame_id = map_frame_;
     tf_msg.header.stamp = localized_scan->odometric_pose.header.stamp;
     tf_msg.child_frame_id = localized_scan->scanner_offset.header.frame_id;
-    tfB_->sendTransform(tf_msg);
+    
+    transforms_[tf_msg.child_frame_id] = tf_msg;
   }
 }
 
@@ -304,6 +308,18 @@ bool MultiRobotSlamToolbox::deserializePoseGraphCallback(
 
   return SlamToolbox::deserializePoseGraphCallback(request_header, req, resp);
 }
+
+/*****************************************************************************/
+void MultiRobotSlamToolbox::publishTransforms()
+/*****************************************************************************/
+{
+  std::unique_lock lock(transforms_mutex_);
+  for (auto& [frame, transform]: transforms_)
+  {
+    tfB_->sendTransform(transform);
+  }
+}
+
 
 /*****************************************************************************/
 void MultiRobotSlamToolbox::convertPose(
