@@ -124,6 +124,10 @@ Initially the robots should start close to each other, in the same orientation, 
 
 ![multirobot_slam_architecture](/images/multi-robot_architecture.png?raw=true "Multi-Robot SLAM Node Architecture")
 
+#### Internal Architecture
+
+![multirobot_slam_internal_architecture](/images/multi-robot_internal_architecture.png?raw=true "Multi-Robot SLAM Internal Architecture")
+
 ### Running Multi-Robot SLAM with turtlebot3 simulation
 
 Install and launch turtlebot3 multirobot simulation as described in the [navigation2 documentation](https://navigation.ros.org/getting_started/index.html)
@@ -135,8 +139,8 @@ ros2 launch nav2_bringup multi_tb3_simulation_launch.py headless:=False
 In two seperate terminals, launch two *multirobot_slam_toolbox_node* instances for robot1 and robot2.
 
 ```shell
-ros2 launch slam_toolbox online_async_multirobot_launch.py namespace:=robot1
-ros2 launch slam_toolbox online_async_multirobot_launch.py namespace:=robot2
+ros2 launch slam_toolbox online_dual_async_multirobot_launch.py namespace:=robot1
+ros2 launch slam_toolbox online_dual_async_multirobot_launch.py namespace:=robot2
 ```
 
 In another two seperate terminals, run *teleop_twist_keyboard* to control the robots. The merged map will appear on both rviz windows when moving the robots around in the environment.
