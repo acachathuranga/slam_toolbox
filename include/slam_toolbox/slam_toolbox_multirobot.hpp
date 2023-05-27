@@ -59,9 +59,12 @@ protected:
   
   std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::LocalizedLaserScan>> localized_scan_pub_;
   rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_;
+  std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::LocalizedLaserScan>> localized_scan_pub_local_link_;
+  rclcpp::Subscription<slam_toolbox::msg::LocalizedLaserScan>::SharedPtr localized_scan_sub_local_link_;
   std::string localized_scan_topic_;
   CollaborationMode collaboration_mode_;
   double shared_min_travel_distance_, shared_min_travel_heading_;
+  bool use_local_link_, publish_hostbot_transform_;
   std::map<std::string, geometry_msgs::msg::TransformStamped> transforms_;
   rclcpp::TimerBase::SharedPtr transform_publish_timer_;
   std::mutex transforms_mutex_;

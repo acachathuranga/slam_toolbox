@@ -34,6 +34,10 @@ MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
     shared_min_travel_distance_ = this->get_parameter("shared_minimum_travel_distance").as_double();
     shared_min_travel_heading_ = this->declare_parameter("shared_minimum_travel_heading", 1.5);
     shared_min_travel_heading_ = this->get_parameter("shared_minimum_travel_heading").as_double();
+    use_local_link_ = this->declare_parameter("use_local_link", true);
+    use_local_link_ = this->get_parameter("use_local_link").as_bool();
+    publish_hostbot_transform_ = this->declare_parameter("publish_hostbot_transform", true);
+    publish_hostbot_transform_ = this->get_parameter("publish_hostbot_transform").as_bool();
 
     if (collaboration_mode == std::string("peer")) {
       RCLCPP_INFO(get_logger(), "Collaboration Mode: peer [Local mapping + Map merging]");
@@ -51,6 +55,12 @@ MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
       collaboration_mode_ = CollaborationMode::PUBLISHER;
     }
 
+    if (use_local_link_) RCLCPP_INFO(get_logger(), "Using Local link");
+    if (collaboration_mode_ == CollaborationMode::SUBSCRIBER && publish_hostbot_transform_) {
+      RCLCPP_INFO(get_logger(), "Publishing hostbot transform!"
+      " Make sure no one else is publishing hostbot map to odom transform");
+    }
+
     switch (collaboration_mode_)
     {
       case CollaborationMode::PEER:
@@ -59,21 +69,30 @@ MultiRobotSlamToolbox::MultiRobotSlamToolbox(rclcpp::NodeOptions options)
         localized_scan_sub_ = this->create_subscription<slam_toolbox::msg::LocalizedLaserScan>(
           localized_scan_topic_, 1000, std::bind(&MultiRobotSlamToolbox::localizedScanCallback, 
           this, std::placeholders::_1));
-        transform_publish_timer_ = this->create_wall_timer(std::chrono::duration<double>(0.1), 
+        transform_publish_timer_ = this->create_wall_timer(std::chrono::duration<double>(0.05), 
           std::bind(&MultiRobotSlamToolbox::publishTransforms, this));
         break;
       
       case CollaborationMode::PUBLISHER:
         localized_scan_pub_ = this->create_publisher<slam_toolbox::msg::LocalizedLaserScan>(
           localized_scan_topic_, 1000);
+          if (use_local_link_) {
+            localized_scan_pub_local_link_ = this->create_publisher<slam_toolbox::msg::LocalizedLaserScan>(
+          localized_scan_topic_.substr(1) + "_local_link", 1000);
+          }
         break;
 
       case CollaborationMode::SUBSCRIBER:
         localized_scan_sub_ = this->create_subscription<slam_toolbox::msg::LocalizedLaserScan>(
           localized_scan_topic_, 1000, std::bind(&MultiRobotSlamToolbox::localizedScanCallback, 
           this, std::placeholders::_1));
-        transform_publish_timer_ = this->create_wall_timer(std::chrono::duration<double>(0.1), 
+        transform_publish_timer_ = this->create_wall_timer(std::chrono::duration<double>(0.05), 
           std::bind(&MultiRobotSlamToolbox::publishTransforms, this));
+        if (use_local_link_) {
+            localized_scan_sub_local_link_ = this->create_subscription<slam_toolbox::msg::LocalizedLaserScan>(
+          localized_scan_topic_.substr(1) + "_local_link", 1000, std::bind(&MultiRobotSlamToolbox::localizedScanCallback, 
+          this, std::placeholders::_1));
+          }
       
       default:;
     }
@@ -145,7 +164,14 @@ void MultiRobotSlamToolbox::localizedScanCallback(
   if (range_scan != nullptr)
   {
     std::unique_lock lock(transforms_mutex_);
-    // Set transform
+
+    // Set hostbot transform
+    if (publish_hostbot_transform_ && (scan_ns == current_ns_)) {
+      setTransformFromPoses(range_scan->GetCorrectedPose(), pose,
+        scan->header.stamp, false);
+    }
+
+    // Set transforms
     pose = range_scan->GetCorrectedPose();
     tf2::Quaternion q(0., 0., 0., 1.0);
     geometry_msgs::msg::TransformStamped tf_msg;
@@ -156,7 +182,9 @@ void MultiRobotSlamToolbox::localizedScanCallback(
     tf_msg.header.stamp = localized_scan->pose.header.stamp;
     tf_msg.child_frame_id = localized_scan->scanner_offset.header.frame_id;
 
-    transforms_[tf_msg.child_frame_id] = tf_msg;
+    // Ignore host transform when running without a namespace
+    if (tf_msg.child_frame_id != "/" + base_frame_)
+      transforms_[tf_msg.child_frame_id] = tf_msg;
   }
 }
 
@@ -248,15 +276,6 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
   const rclcpp::Time & t)
 /*****************************************************************************/
 {
-  if ((std::hypot(pose.GetX() - last_pose_.GetX(), 
-                  pose.GetY() - last_pose_.GetY()) < shared_min_travel_distance_) &&
-      (abs(pose.GetHeading() - last_pose_.GetHeading()) < shared_min_travel_heading_))
-  {
-    // Not enough displacement from last shared LocalizedScan
-    return;
-  }
-  last_pose_ = pose;
-
   slam_toolbox::msg::LocalizedLaserScan scan_msg; 
   scan_msg.scan = *scan;
 
@@ -293,6 +312,16 @@ void MultiRobotSlamToolbox::publishLocalizedScan(
     current_ns_ + base_frame_ :
     current_ns_ + "/" + base_frame_;
 
+  if ((std::hypot(pose.GetX() - last_pose_.GetX(), 
+                  pose.GetY() - last_pose_.GetY()) < shared_min_travel_distance_) &&
+      (abs(pose.GetHeading() - last_pose_.GetHeading()) < shared_min_travel_heading_))
+  {
+    if (use_local_link_) localized_scan_pub_local_link_->publish(scan_msg);
+    // Not enough displacement from last shared LocalizedScan
+    return;
+  }
+  last_pose_ = pose;
+
   localized_scan_pub_->publish(scan_msg);
 }
 
@@ -304,6 +333,16 @@ void MultiRobotSlamToolbox::publishTransforms()
   for (auto& [frame, transform]: transforms_)
   {
     tfB_->sendTransform(transform);
+  }
+
+  if (publish_hostbot_transform_) {
+    boost::mutex::scoped_lock lock(map_to_odom_mutex_);
+    geometry_msgs::msg::TransformStamped msg;
+    msg.transform = tf2::toMsg(map_to_odom_);
+    msg.child_frame_id = odom_frame_;
+    msg.header.frame_id = map_frame_;
+    msg.header.stamp = this->get_clock()->now();
+    tfB_->sendTransform(msg);
   }
 }
 
