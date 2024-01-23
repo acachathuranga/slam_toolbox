@@ -757,17 +757,18 @@ void SlamToolbox::loadSerializedPoseGraph(
     exit(-1);
   }
 
-  // create a current laser sensor
-  LaserRangeFinder * laser =
-    dynamic_cast<LaserRangeFinder *>(
-    dataset_->GetLasers()[0]);
-  Sensor * pSensor = dynamic_cast<Sensor *>(laser);
-  if (pSensor) {
-    SensorManager::GetInstance()->RegisterSensor(pSensor);
-    lasers_.clear();
-  } else {
-    RCLCPP_ERROR(get_logger(), "Invalid sensor pointer in dataset."
-      " Unable to register sensor.");
+  // create a current laser sensors
+  for (auto laser_range_finder : dataset_->GetLasers())
+  {
+    LaserRangeFinder * laser = dynamic_cast<LaserRangeFinder *>(laser_range_finder);
+    Sensor * pSensor = dynamic_cast<Sensor *>(laser);
+    if (pSensor) {
+      SensorManager::GetInstance()->RegisterSensor(pSensor);
+    } else {
+      RCLCPP_ERROR(get_logger(), "Invalid sensor pointer in dataset."
+        " Unable to register sensor.");
+  }
+  lasers_.clear();
   }
 
   solver_->Compute();
